@@ -167,51 +167,6 @@ vector_6f_t flight_set_state(vector_6f_t command) {
 	state.pitch = radsToDegrees(atan2(dcm[2][1], dcm[2][2]));
 	state.yaw = radsToDegrees(atan2(dcm[1][0], dcm[0][0]));
 
-	// Implement rate controller
-	double kpP = 0.00008, kpR = 0.00008, kpY = 0.0004;
-	static double kiP = 0;
-	static double kiY = 0;
-	if (command.y)
-		kiP = command.x / 1000000;
-	else
-		kiY = command.x / 1000000;
-	if (kiP < 0)
-		kiP = 0;
-	if (kiY < 0)
-		kiY = 0;
-
-	// Pitch
-	double angle_error_y = -command.pitch + s.gyro.y;
-	static double i_acc_p = 0;
-	i_acc_p += angle_error_y;
-	double pitch_output = angle_error_y * kpP + i_acc_p * kiP;
-
-	// Roll
-	double angle_error_x = -command.roll + s.gyro.x;
-	static double i_acc_r = 0;
-	i_acc_r += angle_error_x;
-	double roll_output = angle_error_x * kpR + i_acc_r * kiP;
-
-	// Yaw
-	double angle_error_z = -command.yaw + s.gyro.z;
-	static double i_acc_y = 0;
-	i_acc_y += angle_error_z;
-	double yaw_output = angle_error_z * kpY + i_acc_y * kiY;
-
-	/*
-	 if (command.z < 0.02) {
-	 motors_set(0, 0, 0, 0);
-	 i_acc_p = 0;
-	 i_acc_r = 0;
-	 i_acc_y = 0;
-	 } else {
-	 motors_set(command.z - roll_output + pitch_output + yaw_output, // FL
-	 command.z + roll_output + pitch_output - yaw_output, // FR
-	 command.z - roll_output - pitch_output - yaw_output, // BL
-	 command.z + roll_output - pitch_output + yaw_output); // BR
-	 }
-	 */
-
 
 	motors_set(command.z, command.z, command.z, command.z);
 	DFLI("Done set state");
