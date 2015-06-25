@@ -1,0 +1,23 @@
+/*
+ * Copyright 2014, NICTA
+ *
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
+ */
+
+procedure i2c_inf {
+    /*
+     * Transfer some data over I2C. All writes are made before 
+     * the reads.
+     * @param    app_id: Which app is requesting the i2c transfer
+     * @param  dev_addr: The I2C address of the device
+     * @param    wcount: Number of bytes to write
+     * @param    rcount: Number of bytes to read
+     * @return         : 0 on success
+     */ 
+    int transfer(in int app_id, in int dev_addr, 
+            in unsigned int wcount, in unsigned int rcount);
+};

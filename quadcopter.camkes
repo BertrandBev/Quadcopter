@@ -1,0 +1,253 @@
+/*
+ * Copyright 2014, NICTA
+ *
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
+ */
+
+import <std_connector.camkes>;
+
+import "components/gpio/gpio.camkes";
+import "components/spi/spi.camkes";
+import "components/spi_sensors/spi_sensors.camkes";
+import "components/flight/flight.camkes";
+import "components/motors/motors.camkes";
+import "components/i2c/i2c.camkes";
+import "components/timer/timer.camkes";
+import "components/planner/planner.camkes";
+
+
+/* Hardware Components Declerations */
+component clkbase {
+        hardware;
+        include "components/clk/include/porttype.h";
+        dataport CLKData_t cmu_cpu_clk;
+        dataport Buf	   cmu_core_clk;
+        dataport CLKData_t cmu_top_clk;
+}
+
+component gpiobase {
+        hardware;
+        dataport Buf gpio1base;
+        dataport Buf gpio2base;
+        dataport Buf irqcbase;
+        emits IRQGroup26       irq_grp26_int;
+        emits IRQGroup28       irq_grp28_int;
+        emits IRQGroup31       irq_grp31_int;
+        emits EXINT16_31       xint16_31_int;
+}
+
+component uartbase {
+        hardware;
+        dataport Buf uartbase;
+        emits DataAvailable	interrupt;
+}
+
+component spibase {
+        hardware;
+        dataport Buf spi1_reg;
+        emits DataAvailable spi1_int;
+}
+
+component timerbase {
+        hardware;
+        dataport Buf timer_reg;
+        emits DataAvailable timer_pwm_int0;
+        emits DataAvailable timer_pwm_int4;
+} 
+
+component i2c0 {
+        hardware;
+        dataport Buf i2c0_reg;
+        emits DataAvailable i2c0_int;
+}
+
+/* ADL Routing */
+assembly {
+        composition {
+                /* Add hardware component here */
+                component clkbase   clkbase_obj;
+                component gpiobase  gpiobase_obj;
+                component uartbase  uart0base_obj;
+                component uartbase  uart2base_obj;
+                component spibase   spibase_obj;
+                component timerbase timerbase_obj;
+                component i2c0  i2c0_obj;
+                
+
+                /* Add software component here */
+                component gpio          gpio_obj;
+                component spi           spi_obj;
+                component spi_sensors   spi_sensors_obj;
+                component flight        flight_obj;
+                component motors        motors_obj;
+                component i2c           i2c_obj;
+                component timer         timer_obj;
+                component planner       planner_obj;
+                
+
+                /* Add driver to hardware connection here */                
+                // SPI
+                connection seL4HardwareMMIO clk_cmu_cpu_mem(
+                                from spi_obj.cmu_cpu_clk, 
+                                to clkbase_obj.cmu_cpu_clk);
+                connection seL4HardwareMMIO clk_cmu_top_mem(
+                                from spi_obj.cmu_top_clk, 
+                                to clkbase_obj.cmu_top_clk);
+                connection seL4HardwareMMIO clk_cmu_core_mem(
+                                from spi_obj.cmu_core_clk, 
+                                to clkbase_obj.cmu_core_clk);
+                connection seL4HardwareMMIO spi1_mem(
+                                from spi_obj.spi1_reg, 
+                                to spibase_obj.spi1_reg);
+                connection seL4HardwareIRQNative spi1_irq(
+                                from spibase_obj.spi1_int, 
+                                to spi_obj.spi1_int);
+
+                // I2C
+                connection seL4HardwareMMIO i2c0_mem(
+                                from i2c_obj.i2c0, 
+                                to i2c0_obj.i2c0_reg);
+                connection seL4HardwareMMIO gpio_mem1_i2c(
+                                from i2c_obj.gpio1base_i2c, 
+                                to gpiobase_obj.gpio1base);
+                connection seL4HardwareMMIO gpio_mem2_i2c(
+                                from i2c_obj.gpio2base_i2c, 
+                                to gpiobase_obj.gpio2base);
+                connection seL4HardwareIRQNative i2c0_irq(
+                                from i2c0_obj.i2c0_int, 
+                                to i2c_obj.i2c0_int);
+
+                // GPIO
+                connection seL4HardwareMMIO gpio_mem1(
+                                from gpio_obj.gpio1base, 
+                                to gpiobase_obj.gpio1base);
+                connection seL4HardwareMMIO gpio_mem2(
+                                from gpio_obj.gpio2base, 
+                                to gpiobase_obj.gpio2base);
+                connection seL4HardwareMMIO gpio_mem3(
+                                from gpio_obj.irqcbase, 
+                                to gpiobase_obj.irqcbase);
+                connection seL4HardwareInterrupt gpio_grp26_irq(
+                                from gpiobase_obj.irq_grp26_int, 
+                                to gpio_obj.irq_grp26_int);
+                connection seL4HardwareInterrupt gpio_xint16_31_irq(
+                                from gpiobase_obj.xint16_31_int, 
+                                to gpio_obj.xint16_31_int);
+
+
+                // Timer
+                connection seL4HardwareMMIO timer_mem(
+                                from timer_obj.pwm_clk,
+                                to timerbase_obj.timer_reg);
+                connection seL4HardwareInterrupt timer_irq0(
+                                from timerbase_obj.timer_pwm_int0, 
+                                to timer_obj.timer_int0);
+                connection seL4HardwareInterrupt timer_irq4(
+                                from timerbase_obj.timer_pwm_int4, 
+                                to timer_obj.timer_int4);
+
+
+                /*** Component calls and shared memory (listed by caller) ***/
+                // SPI
+                connection seL4RPCCall spi_gpio(from spi_obj.gpio, 
+                                to gpio_obj.gpio);
+
+                // Motors
+                connection seL4RPCCall motors_i2c(from motors_obj.i2c,
+                                to i2c_obj.i2c);
+                connection seL4SharedData motors_i2c_buf(from motors_obj.i2c_buf,
+                                to i2c_obj.i2c_motors);
+
+                // SPI Sensors
+                connection seL4RPCCall spi_sensors_spi(from spi_sensors_obj.spi, 
+                                to spi_obj.spi);
+                connection seL4SharedData spi_sensors_channel(
+                                from spi_sensors_obj.spi_buf, 
+                                to spi_obj.spi1_spi_sensors);
+
+                // Flight
+                connection seL4RPCCall flight_spi_sensors(
+                                from flight_obj.spi_sensors, 
+                                to spi_sensors_obj.sensors);
+                connection seL4RPCCall flight_motors(from flight_obj.motors,
+                                to motors_obj.motors);
+
+
+                // GPIO
+                connection seL4RPCCall gpio_motors(from gpio_obj.motors,
+                                to motors_obj.motors);
+                
+   
+                // Timer
+                connection seL4AsynchNative timer_planner(from timer_obj.planner_wakeup,
+                                to planner_obj.wakeup_signal);
+                                
+                // Planner
+                connection seL4RPCCall planner_flight(from planner_obj.flight,
+                                to flight_obj.flight);
+                connection seL4RPCCall planner_timer(from planner_obj.timer,
+                                to timer_obj.timer);
+                connection seL4SharedData ppm_buf(from planner_obj.ppm,
+                                to gpio_obj.ppm);
+                connection seL4RPCCall planner_sensors(from planner_obj.spi_sensors,
+                                to spi_sensors_obj.sensors);     
+        }
+
+
+        /* Hardware Memory Mapping */
+        configuration {
+               /*** Components ***/
+                // GPIO (Still need to add blade)
+                gpio_obj.irq_grp26_int_priority = 254;
+                gpiobase_obj.irq_grp26_int_priority = 254;
+                timer_obj.timer_int0_priority = 254;
+                timer_obj.timer_int4_priority = 254;
+
+                // SPI (remove the interrupt thread)
+                spi_obj.spi_sc = "none";
+
+                // SPI Sensors
+                spi_sensors_obj.sensors_sc = "none";
+
+                // Flight
+                flight_obj.flight_sc = "none";
+
+                // Motors
+                motors_obj.motors_sc = "none";
+
+                // I2C
+                i2c_obj.i2c_sc = "none"; 
+
+                /*** Hardware Configuration ***/
+                gpiobase_obj.gpio2base_attributes 	= 	"0x14000000:0x1000";	//GPIO
+                gpiobase_obj.gpio1base_attributes 	= 	"0x13400000:0x1000";	//GPIO
+                gpiobase_obj.irqcbase_attributes  	=	"0x10440000:0x1000";	//IRQ COMBINER
+                gpiobase_obj.irq_grp26_int_attributes     =       58;   //Combined IRQ group 26
+                gpiobase_obj.xint16_31_int_attributes     =       64;   //Extern Interrupt EINT16-EINT31
+
+                uart0base_obj.uartbase_attributes 	= 	"0x12C00000:0x1000";    //UART0
+                uart2base_obj.uartbase_attributes 	= 	"0x12C30000:0x1000";    //UART3
+
+                uart0base_obj.interrupt_attributes 	= 	83;                     //UART0 interrupt
+                uart2base_obj.interrupt_attributes 	= 	86;                     //UART3 interrupt
+
+                spibase_obj.spi1_reg_attributes 		= 	"0x12D30000:0x1000";	//SPI1
+                spibase_obj.spi1_int_attributes 		= 	101;			//SPI1  interrupt 
+
+                clkbase_obj.cmu_cpu_clk_attributes 	= 	"0x10010000:0x1000";	//CMU_CPU
+                clkbase_obj.cmu_core_clk_attributes 	= 	"0x10014000:0x1000";	//CMU_CORE
+                clkbase_obj.cmu_top_clk_attributes 	= 	"0x10020000:0x1000";	//CMU_TOP
+
+                timerbase_obj.timer_reg_attributes 	= 	"0x12DD0000:0x1000";	//PWM timers   
+                timerbase_obj.timer_pwm_int0_attributes	= 	68;			        //Timer 0 interrupt
+                timerbase_obj.timer_pwm_int4_attributes	= 	72;			        //Timer 4 interrupt
+
+                i2c0_obj.i2c0_reg_attributes = "0x12C60000:0x1000";
+                i2c0_obj.i2c0_int_attributes = 88;
+        }
+}
+

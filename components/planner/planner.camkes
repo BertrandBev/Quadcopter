@@ -1,0 +1,28 @@
+/*
+ * Copyright 2014, NICTA
+ *
+ * This software may be distributed and modified according to the terms of
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(NICTA_BSD)
+ */
+
+/* 
+ * Takes in high level commands and low level position to figure out the next movement vector.
+ * The movement vector specifies the absolute angles of the quadcopter with x-y plane velocity. 
+ */
+
+import "../../interfaces/flight.idl4";
+import "../../interfaces/timer.idl4";
+
+component planner {
+    control;
+    uses flight_inf flight;
+    
+    uses timer_inf timer;
+    consumes DataAvailable wakeup_signal;
+    
+    dataport Buf ppm;
+    uses spi_sensors_inf spi_sensors;
+}
